@@ -1,14 +1,13 @@
 import 'dart:io';
 
-import 'package:filemanager/file_options_menu.dart';
 import 'package:filemanager/main.dart';
 import 'package:flutter/material.dart';
 
+enum FileOptions{delete, copy, cut, rename}
 
 class FileButton extends StatefulWidget{
-  FileButton({required this.globalKey, required this.fsEntity, required this.openFile, required this.refresh, required this.copyFile, required this.setMode, required this.getMode, required this.selectionList}) : name = fsEntity.path.split('/').last, super(key: globalKey);
-  
-  final GlobalKey<_FileButtonState> globalKey;
+  FileButton({super.key, required this.fsEntity, required this.openFile, required this.refresh, required this.copyFile, required this.setMode, required this.getMode, required this.selectionList}) : name = fsEntity.path.split('/').last;
+
   final FileSystemEntity fsEntity;
   final Function(FileSystemEntity, String) openFile;
   final Function() refresh;
@@ -63,19 +62,6 @@ class _FileButtonState extends State<FileButton>{
     widget.selectionList(widget, true);
   }
 
-  void setButton(bool enabled){
-    setState((){
-      if(enabled){
-        onPress = onPressed;
-        onLongPress = onLongPressed;
-      }
-      else{
-        onPress = null;
-        onLongPress = null;
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context){
     color = null;
@@ -103,7 +89,51 @@ class _FileButtonState extends State<FileButton>{
           const SizedBox(width: 10),
           Expanded(child: Text(widget.name)),
           SafeArea(
-            child: FileOptionsMenu(selected: [widget],),
+            child: PopupMenuButton(
+              itemBuilder: (context) => <PopupMenuEntry<FileOptions>>[
+                const PopupMenuItem<FileOptions>(value: FileOptions.copy,child: Text('Copy')),
+                const PopupMenuItem<FileOptions>(value: FileOptions.cut,child: Text('Cut')),
+                const PopupMenuItem<FileOptions>(value: FileOptions.rename,child: Text('Rename')),
+                const PopupMenuItem<FileOptions>(value: FileOptions.delete,child: Text('Delete')),
+              ],
+              onSelected: (FileOptions value){
+                switch(value){
+                  case FileOptions.cut:
+                    setState((){
+                      onPress = null;
+                      onLongPress = null;
+                    });
+                  continue copy;
+                  copy:
+                  case FileOptions.copy:
+                    widget.copyFile(widget.fsEntity, value);
+                  break;
+                  case FileOptions.rename:
+                    var controller = TextEditingController();
+                    String fileExtension = widget.fsEntity.path.substring(widget.fsEntity.path.lastIndexOf('.'));
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) => AlertDialog(
+                        title: const Text('Rename'),
+                        content: TextField(controller: controller,),
+                        actions: <IconButton>[
+                          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.cancel)),
+                          IconButton(
+                            onPressed: (){
+                              widget.fsEntity.renameSync('${widget.fsEntity.parent.path}/${controller.text}$fileExtension');
+                              Navigator.pop(context);
+                              widget.refresh();
+                            },
+                            icon: const Icon(Icons.check)),
+                        ],
+                    ),);
+                  break;
+                  case FileOptions.delete: widget.fsEntity.deleteSync(recursive: true);
+                  //TODO: call getdirbuttons here
+                }
+                widget.refresh();
+              },
+            ),
           )
         ],
       ),
