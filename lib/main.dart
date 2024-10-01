@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:filemanager/file_options_menu.dart';
 import 'package:io/io.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
@@ -50,7 +51,7 @@ class _MyHomePageState extends State<MyHomePage>{
   List<Widget> _list = List.empty(growable: true);
   FloatingActionButton? _faButton;
   FMMode _mode = FMMode.normal;
-  final List<Widget> _selected = List.empty(growable: true);
+  final List<FileButton> _selected = List.empty(growable: true);
 
   @override
   void initState(){
@@ -145,7 +146,7 @@ class _MyHomePageState extends State<MyHomePage>{
       Directory directory = Directory(dir);
       try{
         directory.listSync().forEach((element) => _list.add(FileButton(
-            key: UniqueKey(),
+            globalKey: GlobalKey(),
             fsEntity: element,
             openFile: openFile,
             refresh: refresh,
@@ -170,12 +171,17 @@ class _MyHomePageState extends State<MyHomePage>{
         child: Text('nothing in this directory'),
       ));
     }
+    List<Widget>? actionsButtons;
+    if(_mode == FMMode.selection){
+      actionsButtons = List.of([FileOptionsMenu(selected: _selected)]);
+    }
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         leading: IconButton(onPressed: backButtonPressed, icon: const Icon(Icons.arrow_back)),
+        actions: actionsButtons,
       ),
       body: Align(
         alignment: alignment,
