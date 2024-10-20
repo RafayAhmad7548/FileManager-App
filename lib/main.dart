@@ -4,6 +4,7 @@ import 'package:io/io.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:filemanager/file_button.dart';
+import 'package:filemanager/file_options_menu.dart';
 
 void main(){
   runApp(const MyApp());
@@ -50,7 +51,7 @@ class _MyHomePageState extends State<MyHomePage>{
   List<Widget> _list = List.empty(growable: true);
   FloatingActionButton? _faButton;
   FMMode _mode = FMMode.normal;
-  final List<Widget> _selected = List.empty(growable: true);
+  final List<FileButton> _selected = List.empty(growable: true);
 
   @override
   void initState(){
@@ -86,31 +87,76 @@ class _MyHomePageState extends State<MyHomePage>{
     });
   }
 
-  void copyFile(FileSystemEntity fsEntity, FileOptions fileOption){
-    setState((){
-      _faButton = FloatingActionButton.extended(
-        onPressed: (){
-          if(fsEntity is File){
-            fsEntity.copySync('$_currentDir/${fsEntity.path.split(Platform.pathSeparator).last}');
-          }
-          else{
-            copyPathSync(fsEntity.path, '$_currentDir/${fsEntity.path.split(Platform.pathSeparator).last}');
-          }
-          if(fileOption == FileOptions.cut && fsEntity.path != '$_currentDir/${fsEntity.path.split(Platform.pathSeparator).last}'){
-            fsEntity.deleteSync(recursive: true);
-          }
-          _faButton = null;
-          getDirButtons(_currentDir);
-        },
-        label: const Row(
-          children: [
-            Icon(Icons.paste),
-            SizedBox(width: 10,),
-            Text('Paste'),
+  void doOnFile(List<FileSystemEntity> fsEntities, FileOptions fileOption, BuildContext context){
+    if(fileOption == FileOptions.copy || fileOption == FileOptions.cut){
+      setState((){
+        _faButton = FloatingActionButton.extended(
+          key: UniqueKey(),
+          onPressed: (){
+            for(FileSystemEntity fsEntity in fsEntities){
+              if(fsEntity is File){
+                fsEntity.copySync('$_currentDir/${fsEntity.path.split(Platform.pathSeparator).last}');
+              }
+              else{
+                copyPathSync(fsEntity.path, '$_currentDir/${fsEntity.path.split(Platform.pathSeparator).last}');
+              }
+              if(fileOption == FileOptions.cut && fsEntity.path != '$_currentDir/${fsEntity.path.split(Platform.pathSeparator).last}'){
+                fsEntity.deleteSync(recursive: true);
+              }
+            }
+            _faButton = null;
+            getDirButtons(_currentDir);
+          },
+          label: const Row(
+            children: [
+              Icon(Icons.paste),
+              SizedBox(width: 10,),
+              Text('Paste'),
+            ],
+          )
+        ); 
+      });
+    }
+    else if(fileOption == FileOptions.rename){
+      var controller = TextEditingController();
+      String fileExtension;
+      FileSystemEntity fsEntity = fsEntities.elementAt(0);
+      if(fsEntity is File){
+        fileExtension = fsEntity.path.substring(fsEntity.path.lastIndexOf('.'));
+      }
+      else{
+        fileExtension = "";
+      }
+      showDialog(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Rename'),
+          content: TextField(
+            controller: controller,
+          ),
+          actions: <IconButton>[
+            IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.cancel)),
+            IconButton(
+              onPressed: (){
+                fsEntity.renameSync('${fsEntity.parent.path}/${controller.text}$fileExtension');
+                Navigator.pop(context);
+                getDirButtons(_currentDir);
+              },
+              icon: const Icon(Icons.check)
+            ),
           ],
-        )
-      ); 
-    });
+        ),
+      );
+    }
+    else if(fileOption == FileOptions.delete){
+      for(FileSystemEntity fsEntity in fsEntities){
+        fsEntity.deleteSync(recursive: true);
+      }
+      getDirButtons(_currentDir);
+    }
+    _mode = FMMode.normal;
+    _selected.clear();
+    getDirButtons(_currentDir);
   }
 
   void openFile(FileSystemEntity fsEntity, String name){
@@ -148,8 +194,7 @@ class _MyHomePageState extends State<MyHomePage>{
             key: UniqueKey(),
             fsEntity: element,
             openFile: openFile,
-            refresh: refresh,
-            copyFile: copyFile,
+            doOnFile: doOnFile,
             setMode: setMode,
             getMode: getMode,
             selectionList: selectionList,
@@ -170,12 +215,16 @@ class _MyHomePageState extends State<MyHomePage>{
         child: Text('nothing in this directory'),
       ));
     }
-
+    List<Widget>? actions = List.empty(growable: true);
+    if(_mode == FMMode.selection){
+      actions.add(FileOptionsMenu(selected: _selected, doOnFile: doOnFile));
+    }
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         leading: IconButton(onPressed: backButtonPressed, icon: const Icon(Icons.arrow_back)),
+        actions: actions,
       ),
       body: Align(
         alignment: alignment,
