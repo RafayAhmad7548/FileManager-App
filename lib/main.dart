@@ -91,7 +91,6 @@ class _MyHomePageState extends State<MyHomePage>{
     if(fileOption == FileOptions.copy || fileOption == FileOptions.cut){
       setState((){
         _faButton = FloatingActionButton.extended(
-          key: UniqueKey(),
           onPressed: (){
             for(FileSystemEntity fsEntity in fsEntities){
               if(fsEntity is File){
